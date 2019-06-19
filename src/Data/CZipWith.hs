@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
@@ -205,53 +204,7 @@ cSequence = cTraverse getCompose
 --   cPoint f = B f f (cPoint f f)
 -- @
 deriveCPointed :: Name -> DecsQ
-deriveCPointed name = do
-  info <- reify name
-  case info of
-#if MIN_VERSION_template_haskell(2,11,0)
-    TyConI (DataD _ _ [_tyvarbnd] _ [con] []) -> do
-#else
-    TyConI (DataD _ _ [_tyvarbnd] [con] []) -> do
-#endif
-      let (cons, elemTys) = case con of
-            NormalC c tys -> (c, tys <&> \(_, t) -> t)
-            RecC    c tys -> (c, tys <&> \(_, _, t) -> t)
-            _ ->
-              error
-                $  "Deriving requires non-GADT, non-infix data type/record!"
-                ++ " (Found: "
-                ++ show con
-                ++ ")"
-      let tyvar = case _tyvarbnd of
-            PlainTV n    -> n
-            KindedTV n _ -> n
-      let fQ   = mkName "f"
-      let pats = [varP fQ]
-      let
-        params = elemTys <&> \ty -> case ty of
-          AppT (VarT a1) _ | a1 == tyvar      -> varE fQ
-          AppT ConT{} (VarT a2) | a2 == tyvar -> [|$(varE 'cPoint) $(varE fQ)|]
-          _ ->
-            error
-              $ "All constructor arguments must have either type k a for some a or C k for some C (with instance CZip C)!"
-              ++ " (Found: "
-              ++ show ty
-              ++ ")"
-      let body = normalB $ appsE $ conE cons : params
-      let funQ = funD 'cPoint [clause pats body []]
-      sequence [instanceD (cxt []) [t|CPointed $(conT name)|] [funQ]]
-    TyConI (DataD{}) ->
-      error
-        $  "datatype must have kind (* -> *) -> *!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
-    _ ->
-      error
-        $  "name does not refer to a datatype!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
+deriveCPointed = undefined -- no TH in cross-compiling anyway
 
 
 -- | Derives a 'CZipWith' instance for a datatype of kind @(* -> *) -> *@.
@@ -292,59 +245,7 @@ deriveCPointed name = do
 --     B (f x1 y1) (f x2 y2) (cZipWith f x3 y3)
 -- @
 deriveCZipWith :: Name -> DecsQ
-deriveCZipWith name = do
-  info <- reify name
-  case info of
-#if MIN_VERSION_template_haskell(2,11,0)
-    TyConI (DataD _ _ [tyvarbnd] _ [con] []) -> do
-#else
-    TyConI (DataD _ _ [tyvarbnd] [con] []) -> do
-#endif
-      let (cons, elemTys) = case con of
-            NormalC c tys -> (c, tys <&> \(_, t) -> t)
-            RecC    c tys -> (c, tys <&> \(_, _, t) -> t)
-            _ ->
-              error
-                $  "Deriving requires non-GADT, non-infix data type/record!"
-                ++ " (Found: "
-                ++ show con
-                ++ ")"
-      let tyvar = case tyvarbnd of
-            PlainTV n    -> n
-            KindedTV n _ -> n
-      let fQ       = mkName "f"
-      let indexTys = zip [1 ..] elemTys
-      let indexTysVars = indexTys <&> \(i :: Int, ty) ->
-            (ty, mkName $ "x" ++ show i, mkName $ "y" ++ show i)
-      let dPat1     = conP cons $ indexTysVars <&> \(_, x, _) -> varP x
-      let dPat2     = conP cons $ indexTysVars <&> \(_, _, x) -> varP x
-      let pats      = [varP fQ, dPat1, dPat2]
-      let
-        params = indexTysVars <&> \(ty, x, y) -> case ty of
-          AppT (VarT a1) _ | a1 == tyvar -> [|$(varE fQ) $(varE x) $(varE y)|]
-          AppT ConT{} (VarT a2) | a2 == tyvar ->
-            [|cZipWith $(varE fQ) $(varE x) $(varE y)|]
-          _ ->
-            error
-              $ "All constructor arguments must have either type k a for some a or C k for some C (with instance CZip C)!"
-              ++ " (Found: "
-              ++ show ty
-              ++ ")"
-      let body = normalB $ appsE $ conE cons : params
-      let funQ = funD 'cZipWith [clause pats body []]
-      sequence [instanceD (cxt []) [t|CZipWith $(conT name)|] [funQ]]
-    TyConI (DataD{}) ->
-      error
-        $  "datatype must have kind (* -> *) -> *!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
-    _ ->
-      error
-        $  "name does not refer to a datatype!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
+deriveCZipWith = undefined -- no TH in cross-compiling anyway
 
 
 -- | Derives a 'CZipWithM' instance for a datatype of kind @(* -> *) -> *@.
@@ -385,62 +286,7 @@ deriveCZipWith name = do
 --     B \<$\> f x1 y1 \<*\> f x2 y2 \<*\> cZipWithM f x3 y3
 -- @
 deriveCZipWithM :: Name -> DecsQ
-deriveCZipWithM name = do
-  info <- reify name
-  case info of
-#if MIN_VERSION_template_haskell(2,11,0)
-    TyConI (DataD _ _ [tyvarbnd] _ [con] []) -> do
-#else
-    TyConI (DataD _ _ [tyvarbnd] [con] []) -> do
-#endif
-      let (cons, elemTys) = case con of
-            NormalC c tys -> (c, tys <&> \(_, t) -> t)
-            RecC    c tys -> (c, tys <&> \(_, _, t) -> t)
-            _ ->
-              error
-                $  "Deriving requires non-GADT, non-infix data type/record!"
-                ++ " (Found: "
-                ++ show con
-                ++ ")"
-      let tyvar = case tyvarbnd of
-            PlainTV n    -> n
-            KindedTV n _ -> n
-      let fQ       = mkName "f"
-      let indexTys = zip [1 ..] elemTys
-      let indexTysVars = indexTys <&> \(i :: Int, ty) ->
-            (ty, mkName $ "x" ++ show i, mkName $ "y" ++ show i)
-      let dPat1     = conP cons $ indexTysVars <&> \(_, x, _) -> varP x
-      let dPat2     = conP cons $ indexTysVars <&> \(_, _, x) -> varP x
-      let pats      = [varP fQ, dPat1, dPat2]
-      let
-        params = indexTysVars <&> \(ty, x, y) -> case ty of
-          AppT (VarT a1) _ | a1 == tyvar -> [|$(varE fQ) $(varE x) $(varE y)|]
-          AppT ConT{} (VarT a2) | a2 == tyvar ->
-            [|cZipWithM $(varE fQ) $(varE x) $(varE y)|]
-          _ ->
-            error
-              $ "All constructor arguments must have either type k a for some a or C k for some C (with instance CZip C)!"
-              ++ " (Found: "
-              ++ show ty
-              ++ ")"
-      let body = normalB $ case params of
-            [] -> [|pure $(conE cons)|]
-            (p1:pr) -> foldl (\x p -> [|$x <*> $p|]) [|$(conE cons) <$> $p1|] pr
-      let funQ = funD 'cZipWithM [clause pats body []]
-      sequence [instanceD (cxt []) [t|CZipWithM $(conT name)|] [funQ]]
-    TyConI (DataD{}) ->
-      error
-        $  "datatype must have kind (* -> *) -> *!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
-    _ ->
-      error
-        $  "name does not refer to a datatype!"
-        ++ " (Found: "
-        ++ show info
-        ++ ")"
-
+deriveCZipWithM = undefined -- no TH in cross-compiling anyway
 
 -- local utility, not worth an extra dependency
 (<&>) :: Functor f => f a -> (a -> b) -> f b
